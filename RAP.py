@@ -8,6 +8,19 @@ def list_devices(row):
         device_list.append(row.EndDevice)
         location_list.append(row.EndDeviceLocation)
 
+def uhigh(row):
+    uhigh_dic = {'01C0': 'U42', '01M0': 'U46', '02M0': 'U45', '11T1': 'U17', '12T1': 'U16', '01RM1':'U35',\
+                 '13T1': 'U15', '14T1': 'U14', '15T1': 'U13', '16T1': 'U12', '17T1': 'U11', '18T1': 'U10', 'T0': 'U26','P1': 'BV37'}
+
+    if row.Name.split('-')[-1] in uhigh_dic.keys():
+        suggestion_uhigh = uhigh_dic[row.Name.split('-')[-1]]
+    else:
+        suggestion_uhigh = uhigh_dic[row.Name.split('_')[-1][-2:]]
+    uhigh = input(f'Please provide the u-high of {row.Name} in {row.Rack}: (Suggestion is {suggestion_uhigh})')
+    if uhigh == '':
+        row.Rack = row.Rack.split('-')[1] + '.' + suggestion_uhigh
+    else:
+        row.Rack = row.Rack.split('-')[1] + '.' + uhigh
 def enter_uhigh(row):
     uhigh = input(f'Please provide the U-high of {row.Name} in Rack {row.Rack}:(exp: U18 or BV37)')
     row.Rack = row.Rack.split('-')[1] + '.' + uhigh
@@ -39,9 +52,13 @@ ndt.EndPort = ndt.EndPort.str.replace('Ethernet', 'Eth')
 ndt.EndPort = ndt.EndPort.str.replace('Management', 'mgmt')
 
 # 构建Device表
+# ndt.apply(list_devices, axis=1)
+# device = pd.DataFrame({'Name': device_list, 'Rack': location_list})
+# device.apply(enter_uhigh, axis=1)
 ndt.apply(list_devices, axis=1)
 device = pd.DataFrame({'Name': device_list, 'Rack': location_list})
-device.apply(enter_uhigh, axis=1)
+print('Press Enter if suggestion is correct or provide the u-high manually. (Example: U26 or BV37)')
+device.apply(uhigh, axis=1)
 
 # 构建标签列
 ndt = ndt.merge(device, how='left', left_on='StartDevice', right_on='Name')
@@ -51,6 +68,7 @@ ndt['RU_End'] = ndt['Rack_y'] + '.' + ndt['EndPort']
 ndt.drop(columns=['Rack_x','Rack_y','Name_x','Name_y'], inplace=True)
 
 #构建AOC表
+print('*'*20)
 aoc = ndt[(ndt.LinkType == 'Data') & (ndt.Speed != 1000)].reset_index(drop=True)#Pandas用 & | ~表示与，或，非。
 d1 = aoc.drop_duplicates(subset='StartDeviceLocation', keep='last').StartDeviceLocation
 l1 = [0]
@@ -100,7 +118,6 @@ with pd.ExcelWriter(f'Done_{filename}.xlsx') as writer:
     order_column(copper).to_excel(writer, sheet_name='Copper', index=False)
     lablemaster.to_excel(writer, sheet_name='LableMaster', index=False)
     cable_count.to_excel(writer, sheet_name='CableCount')
-
 
 
 
