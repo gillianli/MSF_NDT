@@ -1,4 +1,13 @@
 import pandas as pd
+import sys
+from colorama import init, Fore, Style
+
+if sys.platform.startswith('win'):
+    init(convert=True)
+else:
+    init()
+
+
 #定义函数
 def list_devices(row):
     if row.StartDevice not in device_list:
@@ -8,21 +17,23 @@ def list_devices(row):
         device_list.append(row.EndDevice)
         location_list.append(row.EndDeviceLocation)
 
+
+
 def uhigh(row):
     uhigh_dic = {'01C0': 'U42', '01M0': 'U46', '02M0': 'U45', '11T1': 'U17', '12T1': 'U16', '01RM1':'U35',\
-                 '13T1': 'U15', '14T1': 'U14', '15T1': 'U13', '16T1': 'U12', '17T1': 'U11', '18T1': 'U10', 'T0': 'U26','P1': 'BV37'}
+                 '13T1': 'U15', '14T1': 'U14', '15T1': 'U13', '16T1': 'U12', '17T1': 'U11', '18T1': 'U10', 'T0': 'U26','P1': 'BV01'}
 
     if row.Name.split('-')[-1] in uhigh_dic.keys():
         suggestion_uhigh = uhigh_dic[row.Name.split('-')[-1]]
     else:
-        suggestion_uhigh = uhigh_dic[row.Name.split('_')[-1][-2:]]
-    uhigh = input(f'Please provide the u-high of {row.Name} in {row.Rack}: (Suggestion is {suggestion_uhigh})')
+        suggestion_uhigh = uhigh_dic[row.Name.split('-')[-1][-2:]]
+    uhigh = input(f'Please provide the u-high of {Fore.YELLOW}{row.Name}{Style.RESET_ALL} in {row.Rack}: (Suggestion is {suggestion_uhigh})')
     if uhigh == '':
         row.Rack = row.Rack.split('-')[1] + '.' + suggestion_uhigh
     else:
         row.Rack = row.Rack.split('-')[1] + '.' + uhigh
 def enter_uhigh(row):
-    uhigh = input(f'Please provide the U-high of {row.Name} in Rack {row.Rack}:(exp: U18 or BV37)')
+    uhigh = input(f'Please provide the U-high of {Fore.YELLOW}{row.Name}{Style.RESET_ALL} in Rack {row.Rack}:(exp: U18 or BV01)')
     row.Rack = row.Rack.split('-')[1] + '.' + uhigh
 
 def order_column(df):
@@ -45,9 +56,10 @@ if ndt.columns[0] == "#Fields:StartDevice":
 # 初始数据
 device_list = []
 location_list = []
-ndt.Speed = ndt.Speed.fillna(0).astype(int)
+# ndt.Speed = ndt.Speed.fillna(0).astype(int)
 ndt.StartPort = ndt.StartPort.str.replace('Ethernet', 'Eth')
 ndt.StartPort = ndt.StartPort.str.replace('Management', 'mgmt')
+ndt.StartPort = ndt.StartPort.str.replace('console', 'con')
 ndt.EndPort = ndt.EndPort.str.replace('Ethernet', 'Eth')
 ndt.EndPort = ndt.EndPort.str.replace('Management', 'mgmt')
 
@@ -57,7 +69,7 @@ ndt.EndPort = ndt.EndPort.str.replace('Management', 'mgmt')
 # device.apply(enter_uhigh, axis=1)
 ndt.apply(list_devices, axis=1)
 device = pd.DataFrame({'Name': device_list, 'Rack': location_list})
-print('Press Enter if suggestion is correct or provide the u-high manually. (Example: U26 or BV37)')
+print(Fore.MAGENTA + '\nPress Enter if suggestion is correct or provide the u-high manually. (Example: U26 or BV01)\n' + Style.RESET_ALL)
 device.apply(uhigh, axis=1)
 
 # 构建标签列
@@ -68,21 +80,26 @@ ndt['RU_End'] = ndt['Rack_y'] + '.' + ndt['EndPort']
 ndt.drop(columns=['Rack_x','Rack_y','Name_x','Name_y'], inplace=True)
 
 #构建AOC表
-print('*'*20)
+print('\n' + Fore.CYAN + Style.BRIGHT + '*' * 20)
+print('AOC Cables')
+print('*' * 20 + Style.RESET_ALL + '\n')
 aoc = ndt[(ndt.LinkType == 'Data') & (ndt.Speed != 1000)].reset_index(drop=True)#Pandas用 & | ~表示与，或，非。
 d1 = aoc.drop_duplicates(subset='StartDeviceLocation', keep='last').StartDeviceLocation
 l1 = [0]
 for i in d1.index:
     l1.append(i)
-    length = input(f'Please enter the AOC cable length between {aoc.StartDeviceLocation.at[i]} and\
- {aoc.EndDeviceLocation.at[i]} (Numbers Only):')
+    length = input(f'{Fore.BLUE}Please enter the AOC cable length between\n{Fore.YELLOW}{aoc.StartDeviceLocation.at[i]}{Style.RESET_ALL} and\
+\n{Fore.YELLOW}{aoc.EndDeviceLocation.at[i]}{Style.RESET_ALL} (Numbers Only):')
     aoc.loc[l1[0]:l1[1],'Length'] = 'AOC ' + str(int(aoc.Speed.at[i]/1000)) + 'G ' + length + 'M'
     l1.pop(0)
     l1[0] += 1
 aoc_count = aoc.Length.value_counts().to_frame()
 
 # #构建Copper表
-copper = ndt[(ndt.Speed.isin([9600,115200,1000,0])) & (ndt.StartPort != 'power0')].sort_values(by=['StartDeviceLocation'],ascending=True)\
+print('\n' + Fore.GREEN + Style.BRIGHT + '*' * 20)
+print('Copper Cables')
+print('*' * 20 + Style.RESET_ALL + '\n')
+copper = ndt[(ndt.LinkType != 'Data')].sort_values(by=['StartDeviceLocation'],ascending=True)\
     .reset_index(drop=True)
 d1 = copper.drop_duplicates(subset='StartDeviceLocation', keep='last').StartDeviceLocation
 l1 = [0]
@@ -92,8 +109,8 @@ for i in d1.index:
         l1.pop(0)
         l1[0] += 1
     else:
-        length = input(f'Please enter the Copper cable length between {copper.StartDeviceLocation.at[i]} and\
- {copper.EndDeviceLocation.at[i]} (Numbers Only):')
+        length = input(f'{Fore.BLUE}Please enter the Copper cable length between\n{Fore.YELLOW}{copper.StartDeviceLocation.at[i]}{Style.RESET_ALL} and\
+\n{Fore.YELLOW}{copper.EndDeviceLocation.at[i]}{Style.RESET_ALL} (Numbers Only):')
         copper.loc[l1[0]:l1[1], 'Length'] = 'CAT6 ' + length + 'FT'
         l1.pop(0)
         l1[0] += 1
@@ -118,7 +135,6 @@ with pd.ExcelWriter(f'Done_{filename}.xlsx') as writer:
     order_column(copper).to_excel(writer, sheet_name='Copper', index=False)
     lablemaster.to_excel(writer, sheet_name='LableMaster', index=False)
     cable_count.to_excel(writer, sheet_name='CableCount')
-
 
 
 
