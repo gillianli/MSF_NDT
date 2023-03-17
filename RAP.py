@@ -4,7 +4,7 @@ def list_devices(row):
     if row.StartDevice not in device_list:
         device_list.append(row.StartDevice)
         location_list.append(row.StartDeviceLocation)
-    elif row.EndDevice not in device_list:
+    if row.EndDevice not in device_list:
         device_list.append(row.EndDevice)
         location_list.append(row.EndDeviceLocation)
 
